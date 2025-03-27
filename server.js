@@ -12,7 +12,15 @@ const SECRET_KEY = "clave_secreta_super_segura"; // ⚠️ Cambia esto en produc
 
 // Middleware
 app.use(express.json());
-app.use(cors()); // Habilitar CORS
+
+const cors = require('cors');
+
+app.use(cors({
+  origin: 'https://pwa-m875.onrender.com', // Permitir solo este origen
+  methods: ['GET', 'POST', 'PUT', 'DELETE'], // Métodos permitidos
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 
 // Conectar a MongoDB
 mongoose.connect(process.env.MONGO_URI || 'mongodb+srv://albertovs:ola123@cluster0.6zb2ogr.mongodb.net/celeste', {
