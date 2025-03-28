@@ -8,10 +8,10 @@ const router = express.Router();
 // Middleware para verificar JWT
 const authenticateToken = (req, res, next) => {
     const token = req.header('Authorization')?.split(' ')[1];
-    if (!token) return res.status(403).json({ message: 'Acceso denegado' });
+    if (!token) return res.status(401).json({ message: 'Token no proporcionado' });
 
     jwt.verify(token, process.env.SECRET_KEY, (err, user) => {
-        if (err) return res.status(403).json({ message: 'Token inválido' });
+        if (err) return res.status(403).json({ message: 'Token inválido o expirado' });
         req.user = user;
         next();
     });
@@ -27,10 +27,21 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ message: "Todos los campos son obligatorios" });
         }
 
+        // Validar formato de email
+        const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({ message: "Por favor ingrese un email válido" });
+        }
+
         // Verificar si el usuario ya existe
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             return res.status(400).json({ message: "El usuario ya existe" });
+        }
+
+        // Validar longitud de la contraseña
+        if (password.length < 6) {
+            return res.status(400).json({ message: "La contraseña debe tener al menos 6 caracteres" });
         }
 
         // Encriptar contraseña
