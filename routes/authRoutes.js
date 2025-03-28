@@ -1,9 +1,21 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const suscripcion = require('../models/suscription');
-
 const router = express.Router();
+
+// Middleware para verificar JWT
+const authenticateToken = (req, res, next) => {
+    const token = req.header('Authorization')?.split(' ')[1];
+    if (!token) return res.status(403).json({ message: 'Acceso denegado' });
+
+    jwt.verify(token, process.env.SECRET_KEY, (err, user) => {
+        if (err) return res.status(403).json({ message: 'Token inválido' });
+        req.user = user;
+        next();
+    });
+};
 
 // 🔹 Ruta para registrar usuarios
 router.post('/register', async (req, res) => {
@@ -48,15 +60,18 @@ router.post("/login", async (req, res) => {
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) return res.status(400).json({ message: "Contraseña incorrecta" });
 
-        res.json({ message: "Inicio de sesión exitoso", user });
+        // Generar el JWT
+        const token = jwt.sign({ userId: user._id, username: user.username }, process.env.SECRET_KEY, { expiresIn: '1h' });
+
+        res.json({ message: "Inicio de sesión exitoso", token });
     } catch (err) {
         console.error("❌ Error en el login:", err);
         res.status(500).json({ message: "Error en el servidor" });
     }
 });
 
-// Obtener lista de usuarios
-router.get('/users', async (req, res) => {
+// Obtener lista de usuarios (protegida por JWT)
+router.get('/users', authenticateToken, async (req, res) => {
     try {
         const userList = await User.find({}, 'id email suscripcion');
         res.status(200).json(userList);
@@ -66,8 +81,7 @@ router.get('/users', async (req, res) => {
 });
 
 // Actualizar la suscripción del usuario
-router.post('/suscripcion', async (req, res) => {
-    console.log('Solicitud para /suscripcion recibida');
+router.post('/suscripcion', authenticateToken, async (req, res) => {
     const { userId, suscripcion } = req.body;
 
     try {
@@ -81,23 +95,7 @@ router.post('/suscripcion', async (req, res) => {
             return res.status(404).json({ message: 'Usuario no encontrado' });
         }
 
-        // Enviar notificación de prueba
-        await sendPush(suscripcion, user.email);
-
         res.status(200).json({ message: 'Suscripción actualizada en el usuario', user });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-});
-
-// Enviar notificación con la suscripción del usuario
-router.post('/suscripcionMod', async (req, res) => {
-    const { suscripcion, mensaje } = req.body;
-
-    try {
-        await sends(suscripcion, mensaje);
-
-        res.status(200).json({ message: 'Mensaje enviado' });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
